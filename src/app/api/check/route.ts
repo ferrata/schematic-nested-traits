@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
     const canAddLocale = siteLocaleTrait.count < localesLimit;
 
     return Response.json({
-      // companyTraits: company.data.traits,
-      // siteLocaleTrait,
-      // localesLimit,
+      companyTraits,
+      siteLocaleTrait,
+      localesLimit,
       canAddLocale,
     });
   } catch (error) {

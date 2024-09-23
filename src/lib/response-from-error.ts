@@ -5,6 +5,7 @@ import {
 } from "@schematichq/schematic-typescript-node/api";
 import { match } from "ts-pattern";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function responseFromError(error: any) {
   const { message, code } = match(error)
     .when(

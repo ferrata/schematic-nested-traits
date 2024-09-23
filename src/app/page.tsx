@@ -13,7 +13,7 @@ type SiteKey = "site-1" | "site-2";
 type ApiResponse = {
   title: string;
   code: number;
-  data: any;
+  data: string;
   isJson: boolean;
 };
 

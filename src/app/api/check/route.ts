@@ -1,50 +1,65 @@
 import { type NextRequest } from "next/server";
 import { SchematicClient } from "@schematichq/schematic-typescript-node";
-import { UnauthorizedError } from "@schematichq/schematic-typescript-node/api";
 import { strict } from "assert";
+import { responseFromError } from "@/lib/response-from-error";
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey, companyId, siteId } = await request.json();
+    const { apiKey, workspaceId, siteId } = await request.json();
     strict(apiKey, "API key is required");
-    strict(companyId, "Company ID is required");
+    strict(workspaceId, "Workspace ID is required");
     strict(siteId, "Site ID is required");
 
     const client = new SchematicClient({ apiKey });
 
-    const company = await client.companies.getCompany(companyId);
+    const companies = await client.companies.listCompanies();
+
+    const company = companies.data
+      .filter(
+        (c) =>
+          c.keys.filter((k) => k.key === "workspace_id").at(0)?.value ===
+          workspaceId
+      )
+      .at(0);
+
+    strict(company, "Company not found");
+    strict(
+      company.plan?.id,
+      "Company does not have a plan, please assign a plan to the company using Plan audience"
+    );
 
     const entitlements = await client.entitlements.listPlanEntitlements({
-      planId: company.data.plan?.id,
+      planId: company.plan?.id,
     });
+
     const entitlement = entitlements.data
       .filter((e) => e.feature?.name === "locale")
-      .at(0)?.valueNumeric;
-    const localesLimit = entitlement ?? 0;
+      .at(0);
 
-    const companyTraits = company.data.traits ?? {};
-    const companyLocaleTrait = companyTraits.locale as Record<
+    strict(
+      entitlement,
+      "Plan does not have entitlement, please assign a locale entitlement to the plan"
+    );
+
+    const localesLimit = entitlement.valueNumeric ?? 0;
+
+    const workspaceTraits = company.traits ?? {};
+    const workspaceLocaleTrait = workspaceTraits.locale as Record<
       string,
       { count: number }
     >;
 
-    const siteLocaleTrait = companyLocaleTrait[siteId] ?? { count: 0 };
+    const siteLocaleTrait = workspaceLocaleTrait[siteId] ?? { count: 0 };
 
     const canAddLocale = siteLocaleTrait.count < localesLimit;
 
     return Response.json({
-      companyTraits,
+      workspaceLocaleTrait,
       siteLocaleTrait,
       localesLimit,
       canAddLocale,
     });
   } catch (error) {
-    const message =
-      error instanceof UnauthorizedError
-        ? error
-        : error instanceof Error
-        ? error.message
-        : error;
-    return new Response(JSON.stringify({ error: message }), { status: 500 });
+    return responseFromError(error);
   }
 }
